@@ -72,8 +72,8 @@ def move(pixel, action):
 
     return x, y
 
-#/********************SEARCH BY WIDTH*********************/
-def searchByWidth(start, end, pixels, im_paths):
+#/********************BFS*********************/
+def bfs(start, end, pixels, im_paths):
     global MaxFrontier, GoalNode, MaxSearchDeep
     
     color_paths = [128, 128, 128]
@@ -111,12 +111,97 @@ def searchByWidth(start, end, pixels, im_paths):
     print("There's not answer")
     return im_paths
 
+#/********************DFS*********************/
+def dfs(start, end, pixels, im_paths):
+    global MaxFrontier, GoalNode, MaxSearchDeep
+    
+    color_paths = [128, 128, 128]
+    visited = set()
+    stack = list([start])
+
+    while stack:
+        node = stack.pop()
+        arr = ','.join(str(x) for x in node.coordinates)
+        visited.add(arr)
+        im_paths[node.x, node.y] = (color_paths[0], 
+                                    color_paths[1],
+                                    color_paths[2])
+
+        if node.x == end.x and node.y == end.y:
+            GoalNode = node
+            return im_paths
+
+        possiblePaths = getAdjacent(pixels, node)
+        for path in possiblePaths:
+            path_map = ''
+            for x in path.coordinates:
+                path_map +=','.join(str(x))
+
+            if path_map not in visited:
+                stack.append(path)
+                visited.add(path_map)
+                if path.depth > MaxSearchDeep:
+                    MaxSearchDeep = 1 + MaxSearchDeep
+        if len(stack) > MaxFrontier:
+            MaxFrontier = len(stack)
+
+    print("There's not answer")
+    return im_paths
+
+#/**************************AST*************************/
+def ast(start, end, pixels, im_paths):
+    global MaxFrontier, GoalNode, MaxSearchDeep
+
+    color_paths = [128, 128, 128]
+
+    #Transform the initial state
+    arr = ','.join(str(x) for x in start.coordinates)
+
+    #Calculate Euclidean distance
+    key = getDistance(pixels, start, end)
+    visited = set()
+    start.key = key
+    Queue = []
+    Queue.append(start)
+    visited.add(arr)
+
+    while Queue:
+        Queue.sort(key=lambda o: o.key)
+        node = Queue.pop(0)
+        im_paths[node.x, node.y] = (color_paths[0], 
+                                    color_paths[1],
+                                    color_paths[2])
+
+        if node.x == end.x and node.y == end.y:
+            GoalNode = node
+            return im_paths
+        possiblePaths = getAdjacent(pixels, node)
+        path_map = ''
+        for path in possiblePaths:
+            for x in path.coordinates:
+                path_map +=','.join(str(x))
+            if path_map not in visited:
+                key = getDistance(pixels, path, end)
+                path.key = key + path.depth
+                Queue.append(path)
+                visited.add(path_map)
+                if path.depth > MaxSearchDeep:
+                    MaxSearchDeep = 1 + MaxSearchDeep
+
+    print("There's not answer")
+    return im_paths
+
+#/************************EUCLIDEAN DISTANCE*******************/
+def getDistance(pixels, start, end):
+    return 0.1 + (end.x - start.x)**2 + (end.y - start.y)**2
+
 #/**************************MAIN*************************/
 def main():
-    global Width, Height, MaxFrontier, GoalNode, MaxSearchDeep
+    global Width, Height, MaxFrontier, GoalNode, MaxSearchDeep, NodesExpanded
 
     # Open the maze image and make greyscale, and get its dimensions
-    num = str(int(input('Enter the number of the maze that you want to solve: ')))
+    num = str(
+        int(input('Enter the number of the maze that you want to solve: ')))
     maze = Image.open('./assets/maze{}.png'.format(num))
     im = maze.convert('L')
     Width, Height = im.size
@@ -139,40 +224,59 @@ def main():
     GoalState = pixel_end.coordinates
 
     im_rgb = maze.convert('RGB')
-    im_paths = im_rgb.load()
 
-    start = timeit.default_timer()
-    im_solved = searchByWidth(pixel_start, pixel_end, im_bin, im_paths)
-    stop = timeit.default_timer()
-    time = stop - start
+    for i in range(0, 3):
+        # Clear variables
+
+        GoalNode = None
+        NodesExpanded = 0
+        MaxSearchDeep = 0
+        MaxFrontier = 0
+        im_rgb = maze.convert('RGB')
+        im_paths = im_rgb.load()
+
+        #Start timer to know how long each method takes 
+        start = timeit.default_timer()
+        if i == 0:
+            method = 'BFS'
+            im_solved = bfs(pixel_start, pixel_end, im_bin, im_paths)
+        elif i == 1:
+            method = 'DFS'
+            im_solved = dfs(pixel_start, pixel_end, im_bin, im_paths)
+        elif i == 2:
+            method = 'AST'
+            im_solved = ast(pixel_start, pixel_end, im_bin, im_paths)
+
+        stop = timeit.default_timer()
+        time = stop - start
 
 
-    color_solution = [0, 198, 198]
+        color_solution = [0, 198, 198]
 
-    if GoalNode:
-        deep = GoalNode.depth
-        moves = []
-        while pixel_start.coordinates != GoalNode.coordinates:
-            im_solved[GoalNode.x, GoalNode.y] = (color_solution[0], 
-                                            color_solution[1],
-                                            color_solution[2])
-            moves.insert(0, GoalNode.move)
-            GoalNode = GoalNode.parent
+        if GoalNode:
+            deep = GoalNode.depth
+            moves = []
+            while pixel_start.coordinates != GoalNode.coordinates:
+                im_solved[GoalNode.x, GoalNode.y] = (color_solution[0], 
+                                                color_solution[1],
+                                                color_solution[2])
+                moves.insert(0, GoalNode.move)
+                GoalNode = GoalNode.parent
 
-        im_solved[pixel_start.x, pixel_start.y] = (color_solution[0], 
-                                            color_solution[1],
-                                            color_solution[2])
-        im_rgb.save('./solvedMaze.png')
+            im_solved[pixel_start.x, pixel_start.y] = (color_solution[0], 
+                                                color_solution[1],
+                                                color_solution[2])
+            im_rgb.save('./solvedMaze{}.png'.format(method))
 
-        print('Path: ',moves)
-        print('Final Cost: ',len(moves))
-        print('Nodes Expanded: ',str(NodesExpanded))
-        print('Search depth: ',str(deep))
-        print('MaxSearchDeep: ',str(MaxSearchDeep))
-        print('Running Time: ',format(time, '.8f'))
+            #print('Path: ',moves)
+            print('Final Cost: ',len(moves))
+            print('Nodes Expanded: ',str(NodesExpanded))
+            print('Search depth: ',str(deep))
+            print('MaxSearchDeep: ',str(MaxSearchDeep))
+            print('Running Time: ',format(time, '.8f'))
 
-    else:
-        im_rgb.save('./notSolvedMaze.png')
+        else:
+            im_rgb.save('./notSolvedMaze{}.png'.format(method))
 
 
 if __name__ == '__main__':
