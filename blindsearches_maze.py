@@ -269,11 +269,13 @@ def main():
             im_rgb.save('./solvedMaze{}.png'.format(method))
 
             #print('Path: ',moves)
+            print('Algorithm: {}'.format(method))
             print('Final Cost: ',len(moves))
             print('Nodes Expanded: ',str(NodesExpanded))
             print('Search depth: ',str(deep))
             print('MaxSearchDeep: ',str(MaxSearchDeep))
             print('Running Time: ',format(time, '.8f'))
+            print('\n')
 
         else:
             im_rgb.save('./notSolvedMaze{}.png'.format(method))
